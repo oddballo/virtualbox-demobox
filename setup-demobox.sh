@@ -37,7 +37,7 @@ if [ ! -f "$FILE_IMAGE" ]; then
 	{
 	cd "$PATH_DOWNLOADS"
         echo -n "Validating cloud image checksum...."
-        curl https://cloud-images.ubuntu.com/jammy/current/SHA256SUMS \
+        curl -s https://cloud-images.ubuntu.com/jammy/current/SHA256SUMS \
 		| grep " \*jammy-server-cloudimg-amd64.ova$" \
                 | sha256sum --check --status &&
                 echo "Success" ||

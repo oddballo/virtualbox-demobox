@@ -43,14 +43,14 @@ For any instructions below, "Open a terminal" will mean either
 
 Open a terminal and run the following.
 ```
-PATH_VBOX="/c/Program Files (x86)/Oracle/VirtualBox" ./get-virtual-box.sh
+PATH_VBOX="/c/Program Files (x86)/Oracle/VirtualBox" ./setup-demobox.sh
 ```
 
 ### On Linux
 
 Open a terminal and run the following.
 ```
-./get-virtual-box.sh
+./setup-demobox.sh
 ```
 ### Environment variables
 
