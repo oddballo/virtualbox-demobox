@@ -52,6 +52,20 @@ Open a terminal and run the following.
 ```
 ./get-virtual-box.sh
 ```
+### Environment variables
+
+- PATH\_VBOX - Additional path to search for VirtualBox binaries.
+- PATH\_DOWNLOADS - Location to store the compiled seed.iso and the downloaded VM image. Default "/tmp"
+- VM\_NAME - Name of VirtualMachine. Default "demobox".
+- VM\_CPU - Number of CPU cores to allocate. Default "2".
+- VM\_HDD - Resize hard drive size from 10GB original image (in megabytes). Default "20000".
+- VM\_RAM - Megabytes of RAM allocated to VM. Default "2048".
+- VM\_SSH - Local port for port forwarding. Default "2222". Cannot be used by multiple machines.
+
+### Flags
+
+- \-s - Skip checks of whether Virtual Machine has already been imported. Mostly used for debugging.
+- \-f - Force replacement of Virtual Machine if it already exists. Cowardly refuses to overwrite without flag.
 
 ## Installer scripts
 
