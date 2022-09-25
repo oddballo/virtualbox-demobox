@@ -74,7 +74,7 @@ A number of optional scripts are available to configure the Virtual Machine for 
 ### Docker
 Open a terminal and run the following.
 ```
-tool/copy-and-execute.sh 2222 "install/docker.sh"
+tool/copy-and-run.sh 2222 "install/docker.sh"
 ```
 # Connecting to SSH
 
@@ -89,7 +89,7 @@ Alternative, a wrapper script is provided to connect for you.
 
 Open a terminal and run the following.
 ```
-tool/ssh-helper.sh 2222
+tool/ssh.sh 2222
 ```
 
 # License
