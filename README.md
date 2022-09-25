@@ -4,7 +4,7 @@ A number of helper scripts for setting up VirtualBox based Virtual Machines runn
 
 Tested to support Windows (via Git Bash) and Linux.
 
-# Usage
+# Setup Virtual Machine
 
 ## Required tools
 
@@ -29,14 +29,53 @@ The code includes an option to use a remote server to generate the "seed.iso" fi
 There is no guarantee as to the availability of this service. The alternative "build.sh" script in the "seed" folder
 contains the necessary logic to prepare the files on an accessible Linux machine in its absence.
 
-## On Windows
+## "Open a terminal" meaning
 
-- Open "git bash"
-- Navigate to the source
-- Run the get-virtual-box.sh wrapper script
+For any instructions below, "Open a terminal" will mean either 
 
+- opening "git bash" on Windows, or
+- opening a native terminal on Linux, and 
+- navigating to the root of the project.
+
+## Create Virtual Box
+
+### On Windows
+
+Open a terminal and run the following.
 ```
 PATH_VBOX="/c/Program Files (x86)/Oracle/VirtualBox" ./get-virtual-box.sh
+```
+
+### On Linux
+
+Open a terminal and run the following.
+```
+./get-virtual-box.sh
+```
+
+## Installer scripts
+
+A number of optional scripts are available to configure the Virtual Machine for a specific workload.
+
+### Docker
+Open a terminal and run the following.
+```
+tool/copy-and-execute.sh 2222 "install/docker.sh"
+```
+# Connecting to SSH
+
+For authorisation, the Virtual Machine is configured with a dedicated SSH public key at configuration. 
+
+For network access, the Virtual Machine is configured to portforward a local port to the remote SSH port. The
+default port is 2222.
+
+Connecting can be done via any SSH compatible program (e.g., PuTTY) using the details `pineapple@127.0.0.1 -p 2222 -i ~/.ssh/id_busybox`.
+
+Alternative, a wrapper script is provided to connect for you.
+
+Open a terminal and run the following.
+```
+tool/ssh-helper.sh 2222
 ```
 
 # License

@@ -10,6 +10,6 @@ fi
 # Workaround for potentially pulling in DOS mode
 SCRIPT="$(sed 's/^M$//' "$2")"
 
-ssh -F "$DIR/ssh_config" $1 'bash -s' <<EOF
+ssh -F "$DIR/ssh_config" 127.0.0.1 -p $1 'bash -s' <<EOF
 $SCRIPT
 EOF

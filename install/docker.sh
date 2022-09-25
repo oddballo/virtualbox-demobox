@@ -2,6 +2,8 @@
 
 set -eou pipefail
 
+command -v docker &> /dev/null && { echo "Docker already installed. Short circuting."; exit 0; }
+
 sudo apt-get update
 
 sudo apt-get -y install \
