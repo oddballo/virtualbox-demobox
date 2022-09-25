@@ -1,0 +1,31 @@
+#cloud-config
+#vim:syntax=yaml
+users:
+  - name: pineapple
+    gecos: default user with full sudo access
+    groups: sudo
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    lock_passwd: true
+    shell: /bin/bash
+    ssh-authorized-keys:
+      - ##SSH_KEY##
+
+apt_update: true
+
+packages:
+  - tmux
+  - vim
+  - openssh-server
+  - git
+
+write_files:
+  - path: /etc/cloud/cloud.cfg.d/80_disable_network_after_firstboot.cfg
+    content: |
+       network:
+          config: disabled
+
+runcmd:
+  - systemctl restart sshd
+  - growpart /dev/sda 1
+  - resize2fs /dev/sda1
+
