@@ -26,3 +26,10 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plu
 
 sudo usermod -a -G docker "$(id -u -n)"
 
+sudo tee <<EOF /etc/docker/daemon.json
+{
+  "insecure-registries" : ["registry.local:5000"]
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
