@@ -73,17 +73,17 @@ The "setup-demobox.sh" script has the following optional flags.
 - \-s - Skip checks of whether Virtual Machine has already been imported. Mostly used for debugging.
 - \-f - Force replacement of Virtual Machine if it already exists. Cowardly refuses to overwrite without flag.
 
-# Part 2 : Installer scripts
+## Part 2 : Installer scripts
 
 Several optional scripts are available to configure the Virtual Machine for a specific workload.
 
-## Docker
+### Docker
 Open a terminal and run the following.
 ```
 tool/copy-and-run.sh 2222 "install/docker.sh"
 ```
 
-# Part 3 : Connecting via SSH
+## Part 3 : Connecting via SSH
 
 To use the Virtual Machine, connection is made over the network using SSH.
 
