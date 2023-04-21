@@ -27,12 +27,34 @@ fi
 
 shutdownVM(){
     VM_NAME=$1
+    LOG_FILE=$2
     # Shutdown running VMs to configure
-    vboxmanage controlvm "$1" acpipowerbutton &> /dev/null || true
+    vboxmanage controlvm "$1" acpipowerbutton &>> "$LOG_FILE" || true
     while vboxmanage list runningvms | grep -q -E "\"$1\"" &> /dev/null; do
         echo "Waiting for shutdown of VM. Waiting 3 seconds before checking again."
         sleep 3
     done
+}
+
+startVM(){
+    VM_NAME=$1
+    LOG_FILE=$2
+    echo -n "Starting virtual machine..."
+    vboxmanage startvm "$VM_NAME" &>> "$LOG_FILE" &&
+                echo "Success" ||
+                { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
+  
+}
+
+waitForSSH(){
+    DIR=$1
+    VM_SSH=$2
+    while ! timeout 2 "$DIR/tool/stream-over-ssh.sh" $VM_SSH "echo \"Connected over SSH!\""; do
+        echo "SSH not available yet. Waiting upto 5 seconds."
+        sleep 3
+    done
+    echo "SSH available. Continuing after 2 seconds."
+    sleep 2
 }
 
 downloadImage(){
@@ -40,6 +62,7 @@ downloadImage(){
     IMAGE_NAME=$2
     IMAGE_DESCRIPTION=$3
     IMAGE_URL_IMAGE=$4
+    LOG_FILE=$5
 
     echo "The next operation can take some time to complete."
     echo -n "Fetching cloud image ($IMAGE_DESCRIPTION)..."
@@ -72,46 +95,21 @@ validateImage(){
 }
 
 DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-cd "$DIR"
+
+#
+#   Create empty log file
+#
 LOG_FILE="$DIR/log.txt"
 >"$LOG_FILE"
 
-RETRY_LIMIT=3
-for (( ATTEMPT=0; ATTEMPT<$RETRY_LIMIT; ATTEMPT++)); do
+#
+#   Check tools in place
+#
+command -v vboxmanage &> /dev/null || { echo "Missing vboxmanage. Is VirtualBox installed?"; exit 1; }
 
-    downloadImage \
-        "$PATH_DOWNLOADS" \
-        "$IMAGE_NAME" \
-        "$IMAGE_DESCRIPTION" \
-        "$IMAGE_URL_IMAGE"
-
-    validateImage \
-        "$PATH_DOWNLOADS" \
-        "$IMAGE_NAME" \
-        "$IMAGE_URL_CHECKSUM" \
-        || { rm "$PATH_DOWNLOADS/$IMAGE_NAME"; echo "Removed corrupt image. Trying again."; continue; }
-
-    break
-done
-if [ $ATTEMPT -ge $RETRY_LIMIT ]; then
-    echo "Hit max retry limit for fetching image. Aborting."
-    exit 1
-fi
-
-FILE_SEED="${PATH_DOWNLOADS}/seed.iso"
-if [ ! -f "$FILE_SEED" ]; then
-    {
-        cd "$DIR/seed"
-        echo -n "Building seed.iso using remote webserver..."
-        ./build-using-web.sh &>> "$LOG_FILE" &&
-            echo "Success" ||
-            { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
-        cp seed.iso "$FILE_SEED"
-    }
-else
-    echo "Found seed.iso. Reusing (delete file $FILE_SEED to trigger regeneration)."
-fi
-
+#
+#   Accept flags
+#
 FLAG_FORCE=1
 FLAG_SKIP_IMPORT=1
 while getopts :fs FLAG; do
@@ -121,19 +119,20 @@ while getopts :fs FLAG; do
     esac
 done
 
-command -v vboxmanage &> /dev/null || { echo "Missing vboxmanage. Is VirtualBox installed?"; exit 1; }
-
 echo "DEBUG FLAG_FORCE=$FLAG_FORCE" &>> "$LOG_FILE"
 echo "DEBUG FLAG_SKIP_IMPORT=$FLAG_SKIP_IMPORT" &>> "$LOG_FILE"
 
 if [[ $FLAG_SKIP_IMPORT -eq 0 ]]; then
     echo "FLAG_SKIP_IMPORT set. Skipping import of image and using exisiting deployment."
-else	
+else
+    #
+    #   Check if appliance already in place
+    #
     if vboxmanage list vms | grep -q "^\"$VM_NAME\" "; then
         echo "Virtual Box \"$VM_NAME\" already exists."
         if [[ $FLAG_FORCE -eq 0 ]]; then
             echo -n "FLAG_FORCE enabled. Destroying $VM_NAME..."
-            shutdownVM "$VM_NAME"
+            shutdownVM "$VM_NAME" "$LOG_FILE"
             vboxmanage unregistervm --delete "$VM_NAME" &>> "$LOG_FILE" &&
                 echo "Success" ||
                 { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
@@ -145,8 +144,54 @@ else
     else
         echo "Virtual Box \"$VM_NAME\" not found locally"
     fi
-    echo -n "Importing Virtual Box \"$VM_NAME\"..."
 
+    #
+    #   Image download and verification
+    #
+    RETRY_LIMIT=3
+    for (( ATTEMPT=0; ATTEMPT<$RETRY_LIMIT; ATTEMPT++)); do
+
+        downloadImage \
+            "$PATH_DOWNLOADS" \
+            "$IMAGE_NAME" \
+            "$IMAGE_DESCRIPTION" \
+            "$IMAGE_URL_IMAGE" \
+            "$LOG_FILE"
+
+        validateImage \
+            "$PATH_DOWNLOADS" \
+            "$IMAGE_NAME" \
+            "$IMAGE_URL_CHECKSUM" \
+            || { rm "$PATH_DOWNLOADS/$IMAGE_NAME"; echo "Removed corrupt image. Trying again."; continue; }
+
+        break
+    done
+    if [ $ATTEMPT -ge $RETRY_LIMIT ]; then
+        echo "Hit max retry limit for fetching image. Aborting."
+        exit 1
+    fi
+
+    #
+    #   Seed generation
+    #
+    FILE_SEED="${PATH_DOWNLOADS}/seed.iso"
+    if [ ! -f "$FILE_SEED" ]; then
+        {
+            cd "$DIR/seed"
+            echo -n "Building seed.iso using remote webserver..."
+            ./build-using-web.sh &>> "$LOG_FILE" &&
+                echo "Success" ||
+                { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
+            cp seed.iso "$FILE_SEED"
+        }
+    else
+        echo "Found seed.iso. Reusing (delete file $FILE_SEED to trigger regeneration)."
+    fi
+
+    #
+    #   Appliance creation
+    #
+    echo -n "Importing Virtual Box \"$VM_NAME\"..."
     vboxmanage import \
         --options importtovdi \
         --vsys 0 \
@@ -158,11 +203,25 @@ else
         --vmname "$VM_NAME" &>> "$LOG_FILE" &&
                 echo "Success" ||
                 { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
+
+    # Attaching seed ISO to the box
+    echo -n "Attaching seed.iso to the virtual machine..."
+    vboxmanage storageattach "$VM_NAME" \
+        --storagectl IDE \
+        --port 0 \
+        --device 0 \
+        --type dvddrive \
+        --medium "$FILE_SEED" &>> "$LOG_FILE" &&
+                echo "Success" ||
+                { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
 fi
 
 # Shutdown running VMs to configure
-shutdownVM "$VM_NAME"
+shutdownVM "$VM_NAME" "$LOG_FILE"
 
+#
+#   Create a host interface (if missing)
+#
 INTERFACES="$(vboxmanage list hostonlyifs)" 
 if [[ "$INTERFACES" == "" ]]; then
     echo -n "Generating Host only interface..."
@@ -173,25 +232,31 @@ if [[ "$INTERFACES" == "" ]]; then
     INTERFACES="$(vboxmanage list hostonlyifs)" 
 fi
 
-# Remove NAT SSH rule (if present). Ignore failure to remove rule
+#
+#   Remove NAT SSH rule (if present). Ignore failure to remove rule
+#
 vboxmanage modifyvm "$VM_NAME" --nic1 nat --natnet1 default --natpf1 delete ssh &> /dev/null || true
 
+#
+#   Setup SSH port forward
+#
 INTERFACE="$(vboxmanage list hostonlyifs | grep "^Name:" | tr -s " " | cut -f2- -d" ")"
-
-# Setup SSH port forward
 echo -n "Setting up SSH port forward from 127.0.0.1:$VM_SSH to Virtual Machine..."
 vboxmanage modifyvm "$VM_NAME" --nic1 nat --natnet1 default --natpf1 ssh,tcp,127.0.0.1,${VM_SSH},,22 \
     --nic2 hostonly --hostonlyadapter2 "$INTERFACE" &>> "$LOG_FILE" &&
     echo "Success" ||
     { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
 
-
-# Attach IDE - Ignore failure - likely already in place
+#
+#   Attach IDE - Ignore failure - likely already in place
+#
 vboxmanage storagectl "$VM_NAME" \
     --name IDE \
     --add ide &> /dev/null || true
 
-# Resize HDD image
+#
+#   Resize HDD image
+#
 HDD="$(vboxmanage showvminfo --machinereadable "$VM_NAME" | grep "^\"SCSI-0-0" | cut -f2- -d= | cut -f2 -d\")"
 echo -n "Resizing hard drive to $VM_HDD..."
 vboxmanage modifyhd "$HDD" \
@@ -199,49 +264,25 @@ vboxmanage modifyhd "$HDD" \
             echo "Success" ||
             { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
 
+startVM "$VM_NAME" "$LOG_FILE"
 
-# Attaching seed ISO to the box
-echo -n "Attaching seed.iso to the virtual machine..."
-vboxmanage storageattach "$VM_NAME" \
-    --storagectl IDE \
-    --port 0 \
-    --device 0 \
-    --type dvddrive \
-    --medium "$FILE_SEED" &>> "$LOG_FILE" &&
-            echo "Success" ||
-            { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
+waitForSSH "$DIR" "$VM_SSH"
 
-
-echo -n "Starting virtual machine..."
-vboxmanage startvm "$VM_NAME" &>> "$LOG_FILE" &&
-            echo "Success" ||
-            { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
-  
-
-cd "$DIR"
-while ! timeout 2 ./tool/stream-over-ssh.sh $VM_SSH "echo \"Connected over SSH!\""; do
-    echo "SSH not available yet. Waiting upto 5 seconds."
-    sleep 3
-done
-echo "SSH available. Continuing after 2 seconds."
-sleep 2
-
-# Configure box over SSH
-./tool/stream-over-ssh.sh $VM_SSH "$(cat <<EOF
+#
+#   Configure box over SSH
+#
+"$DIR/tool/stream-over-ssh.sh" $VM_SSH "$(cat <<EOF
 echo "$VM_NAME" | sudo tee /etc/hostname &>/dev/null
 if ! grep -q " $VM_NAME" /etc/hosts; then
 	echo "127.0.0.1 $VM_NAME" | sudo tee -a /etc/hosts &>/dev/null
-    echo "Rebooting machine after host configuration."
-    sudo reboot
 fi
 EOF
-)" || true
+)"
 
-while ! timeout 2 ./tool/stream-over-ssh.sh $VM_SSH "echo \"Connected over SSH!\""; do
-    echo "SSH not available yet. Waiting upto 5 seconds."
-    sleep 3
-done
-echo "SSH available. Continuing after 2 seconds."
-sleep 2
+shutdownVM "$VM_NAME" "$LOG_FILE"
+
+startVM "$VM_NAME" "$LOG_FILE"
+
+waitForSSH "$DIR" "$VM_SSH"
 
 echo "Setup complete! Use \"./tool/ssh.sh $VM_SSH\" to connect to the box"
