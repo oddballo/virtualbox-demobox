@@ -25,6 +25,16 @@ if [ ! -d "$PATH_DOWNLOADS" ]; then
 	mkdir -p "$PATH_DOWNLOADS"
 fi
 
+shutdownVM(){
+    VM_NAME=$1
+    # Shutdown running VMs to configure
+    vboxmanage controlvm "$1" acpipowerbutton &> /dev/null || true
+    while vboxmanage list runningvms | grep -q -E "\"$1\"" &> /dev/null; do
+        echo "Waiting for shutdown of VM. Waiting 3 seconds before checking again."
+        sleep 3
+    done
+}
+
 downloadImage(){
     PATH_DOWNLOADS=$1
     IMAGE_NAME=$2
@@ -117,17 +127,19 @@ echo "DEBUG FLAG_FORCE=$FLAG_FORCE" &>> "$LOG_FILE"
 echo "DEBUG FLAG_SKIP_IMPORT=$FLAG_SKIP_IMPORT" &>> "$LOG_FILE"
 
 if [[ $FLAG_SKIP_IMPORT -eq 0 ]]; then
-    echo "FLAG_SKIP_IMPORT set. Forced to skip import checks."
+    echo "FLAG_SKIP_IMPORT set. Skipping import of image and using exisiting deployment."
 else	
     if vboxmanage list vms | grep -q "^\"$VM_NAME\" "; then
-        echo "Virtual Box already exists. Continuing with configuration"
+        echo "Virtual Box \"$VM_NAME\" already exists."
         if [[ $FLAG_FORCE -eq 0 ]]; then
             echo -n "FLAG_FORCE enabled. Destroying $VM_NAME..."
+            shutdownVM "$VM_NAME"
             vboxmanage unregistervm --delete "$VM_NAME" &>> "$LOG_FILE" &&
                 echo "Success" ||
                 { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
         else
-            echo "Virtual machine \"$VM_NAME\" already exists. Run with -f to force cleanup ahead of deploy."
+            echo "Virtual machine \"$VM_NAME\" already exists. Run with -f to force cleanup ahead of deploy,"
+            echo "or -s to skip the import of the image and continue to the final configuration"
             exit 1
         fi
     else
@@ -147,6 +159,9 @@ else
                 echo "Success" ||
                 { echo "Failure. Please check log at $LOG_FILE for more information."; exit 1; }
 fi
+
+# Shutdown running VMs to configure
+shutdownVM "$VM_NAME"
 
 INTERFACES="$(vboxmanage list hostonlyifs)" 
 if [[ "$INTERFACES" == "" ]]; then
@@ -216,7 +231,17 @@ sleep 2
 echo "$VM_NAME" | sudo tee /etc/hostname &>/dev/null
 if ! grep -q " $VM_NAME" /etc/hosts; then
 	echo "127.0.0.1 $VM_NAME" | sudo tee -a /etc/hosts &>/dev/null
+    echo "Rebooting machine after host configuration."
+    sudo reboot
 fi
-sudo reboot
 EOF
-)"
+)" || true
+
+while ! timeout 2 ./tool/stream-over-ssh.sh $VM_SSH "echo \"Connected over SSH!\""; do
+    echo "SSH not available yet. Waiting upto 5 seconds."
+    sleep 3
+done
+echo "SSH available. Continuing after 2 seconds."
+sleep 2
+
+echo "Setup complete! Use \"./tool/ssh.sh $VM_SSH\" to connect to the box"
