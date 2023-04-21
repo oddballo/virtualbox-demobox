@@ -21,6 +21,14 @@ To run one instance of the Virtual machine, the following will be needed;
 - (Windows only) [Git bash](https://git-scm.com/downloads) (Tested with 2.37.3)
 - (Optional) A Linux machine with "genisoimage" for generating the "seed.iso" file
 
+## Virtual box configuration
+
+The executable "VBoxManage.exe" needs to be on the PATH.
+
+On Windows, this is found by default at "C:\Program Files\Oracle\VirtualBox"
+
+To test, open a terminal and run "vboxmanage". If there is an error, investigate if PATH contains the folder of your VirtualBox installation.
+
 ## Remote ISO packaging
 
 The code includes an option to use a remote server to generate the "seed.iso" file. (Service: tools.stwcreation.com).
