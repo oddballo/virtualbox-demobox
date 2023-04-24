@@ -11,6 +11,7 @@ VM_SSH="${VM_SSH:-2222}"
 IMAGE_CODENAME="jammy"
 IMAGE_DESCRIPTION="Ubuntu 22.04"
 IMAGE_NAME="$IMAGE_CODENAME-server-cloudimg-amd64.ova"
+FILE_CHECKSUM="${IMAGE_NAME}_SHA256SUMS"
 IMAGE_URL_IMAGE="https://cloud-images.ubuntu.com/$IMAGE_CODENAME/current/$IMAGE_NAME"
 IMAGE_URL_CHECKSUM="https://cloud-images.ubuntu.com/$IMAGE_CODENAME/current/SHA256SUMS"
 
@@ -84,11 +85,15 @@ validateImage(){
     PATH_DOWNLOADS=$1
     IMAGE_NAME=$2
     IMAGE_URL_CHECKSUM=$3
+    FILE_CHECKSUM=$4
 
     cd "$PATH_DOWNLOADS"
     echo -n "Validating cloud image checksum..."
-    curl -s "$IMAGE_URL_CHECKSUM" \
-        | grep " \*$IMAGE_NAME$" \
+    if [ ! -f "$FILE_CHECKSUM" ]; then
+        curl -s "$IMAGE_URL_CHECKSUM" -o "$FILE_CHECKSUM" ||
+            { echo "Failed to download checksum file. Aborting."; exit 1; }
+    fi
+    grep " \*$IMAGE_NAME$" "$FILE_CHECKSUM" \
         | sha256sum --check --status &&
         echo "Success" ||
         { echo "Failure. Potential corruption or network issue when fetching image."; return 1; }
@@ -162,6 +167,7 @@ else
             "$PATH_DOWNLOADS" \
             "$IMAGE_NAME" \
             "$IMAGE_URL_CHECKSUM" \
+            "$FILE_CHECKSUM" \
             || { rm "$PATH_DOWNLOADS/$IMAGE_NAME"; echo "Removed corrupt image. Trying again."; continue; }
 
         break
