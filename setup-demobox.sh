@@ -35,6 +35,7 @@ shutdownVM(){
         echo "Waiting for shutdown of VM. Waiting 3 seconds before checking again."
         sleep 3
     done
+    sleep 2
 }
 
 startVM(){
