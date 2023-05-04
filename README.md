@@ -73,7 +73,7 @@ The "setup-demobox.sh" script has the following optional flags.
 - \-s - Skip checks of whether Virtual Machine has already been imported. Mostly used for debugging.
 - \-f - Force replacement of Virtual Machine if it already exists. Cowardly refuses to overwrite without flag.
 
-## Part 2 : Installer scripts
+## Part 2 : Installer scripts (optional)
 
 Several optional scripts are available to configure the Virtual Machine for a specific workload.
 
@@ -81,6 +81,11 @@ Several optional scripts are available to configure the Virtual Machine for a sp
 Open a terminal and run the following.
 ```
 tool/copy-and-run.sh 2222 "install/docker.sh"
+```
+### Terraform
+Open a terminal and run the following.
+```
+tool/copy-and-run.sh 2222 "install/terraform.sh"
 ```
 
 ## Part 3 : Connecting via SSH
