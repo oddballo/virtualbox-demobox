@@ -17,8 +17,7 @@ fi
 # Install dependencies
 sudo apt-get install -y \
     build-essential libx11-dev libxft-dev libxinerama-dev \
-    xserver-xorg-dev xutils-dev xinit
-
+    xrdp xdg-utils xserver-xorg-dev xutils-dev xinit x11-xserver-utils
 cd
 
 mkdir -p projects
@@ -53,4 +52,9 @@ popd
 
 cat <<EOF > .xinitrc
 exec dwm
+EOF
+
+# For XRDP use
+cat <<EOF > .xsession
+dwm
 EOF
